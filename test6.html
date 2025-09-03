@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>ISOLATED – AREA SHIPPING ROBOT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#eef3f8;--card:rgba(255,255,255,.96);--ink:#0f172a;--muted:#64748b;--brand:#1f78d1;--ok:#16a34a;--bad:#dc2626;--warn:#eab308}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Arial}
+    header{position:sticky;top:0;z-index:10;background:var(--brand);color:#fff;padding:14px 16px}
+    h1{margin:0;font-size:20px;letter-spacing:.3px}
+    h2{margin:.2em 0 10px;font-size:18px}
+    .layout{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:18px}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.08);padding:16px}
+    .right-grid{display:grid;grid-template-columns:repeat(2,minmax(280px,1fr));gap:18px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{border:0;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700;background:var(--brand);color:#fff;display:inline-flex;align-items:center;gap:8px}
+    .btn.ghost{background:#e2e8f0;color:var(--ink)}
+    .btn.alt{background:#e67e22}
+    .status{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800}
+    .ok{background:var(--ok);color:#fff} .bad{background:var(--bad);color:#fff} .warn{background:var(--warn);color:#111}
+    .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;font-size:14px}
+    .mini{font-size:13px;color:var(--muted)}
+    iframe#cam{width:980px;height:551px;border:0;border-radius:12px;background:#000}
+    canvas#map2d{width:100%;height:auto;border-radius:12px;background:#fff}
+    ul.log{list-style:none;padding:0;margin:0;max-height:220px;overflow:auto}
+    ul.log li{padding:6px 8px;border-radius:8px;margin-bottom:6px;background:#f8fafc;border:1px solid #e2e8f0}
+    .slots{display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:10px}
+    .slot{padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
+    .slot h3{margin:0 0 4px;font-size:15px}
+    .sep{height:1px;background:#e5e7eb;margin:10px 0}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left}
+    th{background:#f1f5f9}
+    footer{padding:12px;text-align:center;color:var(--muted);font-size:12px}
+    .pill{background:#f1f5f9;padding:6px 10px;border-radius:999px;font-weight:600}
+    /* simple inline svg icons size */
+    .icon{width:18px;height:18px;display:inline-block}
+  </style>
+</head>
+<body>
+  <header><h1>ISOLATED – AREA SHIPPING ROBOT • Dashboard</h1></header>
+
+  <main class="layout">
+    <!-- LEFT: Stream video (1/2 màn hình) -->
+    <section class="card">
+      <h2>Stream video</h2>
+      <iframe id="cam" src="https://kinhtevadubao.vn/stores/news_dataimages/kinhtevadubaovn/022021/11/12/che-do-chi-phi-cach-ly-kham-chua-benh-trong-thoi-gian-cach-ly-phong-chong-covid-19-moi-19-.1104.jpg" allowfullscreen></iframe>
+    </section>
+
+    <!-- RIGHT: 2x2 panels -->
+    <div class="right-grid">
+      <!-- Map -->
+      <section class="card">
+        <h2>Bản đồ 2D</h2>
+        <canvas id="map2d" width="480" height="480"></canvas>
+        <div class="row" style="margin-top:10px">
+          <span class="pill" id="poseText">x=0.000 m, y=0.000 m, θ=0.00 rad</span>
+          <button class="btn ghost" id="resetPose">Reset bản đồ</button>
+        </div>
+      </section>
+
+      <!-- Patient -->
+
+	<section class="card">
+  <h2>Thông tin bệnh nhân</h2>
+  <div class="kv">
+    <div>Họ tên:</div> <div id="p_name">Đỗ Quốc Huy</div>
+    <div>Phòng:</div>  <div id="p_room">A115</div>
+    <div>Mã đơn:</div> <div id="p_order">5</div>
+    <div>Ô lấy hàng:</div> <div id="p_box">2</div>
+    <div>Trạng thái:</div> <div><span id="p_status" class="status warn">Đang giao</span></div>
+  </div>
+  <div class="sep"></div>
+  <div class="row">
+    <button class="btn" id="startBtn">
+      <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+      Bắt đầu giao
+    </button>
+    <button class="btn ghost" id="confirmBtn">
+      <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+      Xác nhận
+    </button>
+  </div>
+  <div class="sep"></div>
+  <h3>Lịch sử giao</h3>
+  <table>
+    <thead><tr><th>#</th><th>Họ tên</th><th>Phòng</th><th>Mã đơn</th><th>Trạng thái</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Nguyễn Văn Hùng</td><td>A112</td><td>1</td><td>Đã giao</td></tr>
+      <tr><td>2</td><td>Trần Thị Mai</td><td>B105</td><td>2</td><td>Đã giao</td></tr>
+      <tr><td>3</td><td>Phạm Minh Tuấn</td><td>A108</td><td>3</td><td>Đã giao</td></tr>
+      <tr><td>4</td><td>Lê Thị Ngọc Anh</td><td>B117</td><td>4</td><td>Đã giao</td></tr>
+      <tr><td>5</td><td>Đỗ Quốc Huy</td><td>A115</td><td>5</td><td>Đang giao</td></tr>
+      <tr><td>6</td><td>Vũ Thị Thanh</td><td>B102</td><td>6</td><td>Chưa giao</td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+      <!-- Slots + control -->
+      <section class="card">
+        <h2>Khoang chứa & Điều khiển</h2>
+        <div class="slots">
+          <div class="slot">
+            <h3>Ô #1</h3>
+            <div>Trạng thái: <span class="status ok">Không chứa hàng</span></div>
+            <div>Servo:
+              <button class="btn ghost" onclick="setServo(1,0)">Đóng</button>
+              <button class="btn" onclick="setServo(1,90)">Mở</button>
+            </div>
+          </div>
+          <div class="slot">
+            <h3>Ô #2</h3>
+            <div>Trạng thái: <span class="status bad">Đang chứa hàng</span></div>
+            <div>Servo:
+              <button class="btn ghost" onclick="setServo(2,0)">Đóng</button>
+              <button class="btn" onclick="setServo(2,90)">Mở</button>
+            </div>
+          </div>
+          <div class="slot">
+            <h3>Ô #3</h3>
+            <div>Trạng thái: <span class="status bad">Đang chứa hàng</span></div>
+            <div>Servo:
+              <button class="btn ghost" onclick="setServo(3,0)">Đóng</button>
+              <button class="btn" onclick="setServo(3,90)">Mở</button>
+            </div>
+          </div>
+          <div class="slot">
+            <h3>Ô #4</h3>
+            <div>Trạng thái: <span class="status bad">Đang chứa hàng</span></div>
+            <div>Servo:
+              <button class="btn ghost" onclick="setServo(4,0)">Đóng</button>
+              <button class="btn" onclick="setServo(4,90)">Mở</button>
+            </div>
+          </div>
+        </div>
+        <div class="sep"></div>
+        <div class="row">
+          <button class="btn" id="lightOn">
+            <!-- bulb on -->
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21h6v-1a3 3 0 0 0-3-3 3 3 0 0 0-3 3v1zm3-19a7 7 0 0 0-4.9 12A6.5 6.5 0 0 1 9 18h6a6.5 6.5 0 0 1 1.9-4 7 7 0 0 0-4.9-12z"/></svg>
+            Đèn ON
+          </button>
+          <button class="btn ghost" id="lightOff">
+            <!-- bulb off -->
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M2 3.3 3.3 2 22 20.7 20.7 22 16 17.3V21H8v-1a4 4 0 0 1 4-4c.5 0 1 .1 1.4.2l-9-9A7 7 0 0 1 16.8 6l-1.5 1.5A5 5 0 0 0 7 7c0 .9.2 1.8.6 2.6L2 3.3z"/></svg>
+            Đèn OFF
+          </button>
+          <button class="btn alt" id="buzzOn">
+            <!-- bell -->
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2zm6-6V11a6 6 0 1 0-12 0v5L4 18v1h16v-1l-2-2z"/></svg>
+            Buzzer
+          </button>
+        </div>
+      </section>
+
+      <!-- Event log + System status (gộp) -->
+      <section class="card">
+        <h2>Trạng thái hệ thống</h2>
+        <div class="kv">
+          <div>Pin:</div>    <div><span id="bat">— %</span></div>
+          <div>Wi-Fi:</div>  <div><span id="rssi">— dBm</span></div>
+          <div>CPU Load:</div><div><span id="cpu">— %</span></div>
+        </div>
+
+        <div class="sep"></div>
+        <h2>Snapshot gần nhất</h2>
+        <img id="shot" alt="snapshot" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;background:#000"/>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* ===== Helpers ===== */
+    const jget = (u)=>fetch(u).then(r=>r.json()).catch(()=>null);
+    const post = (u)=>fetch(u,{method:'POST'}).catch(()=>null);
+
+    /* ===== Stream snapshot (fixed URL in source) ===== */
+    const SNAPSHOT_URL = "https://file.qdnd.vn/data/images/0/2021/07/06/lenguyetminh/5cce57e5-2c2f-4e88-951f-5b84386f9526.jpeg?dpi=150&quality=100&w=575"; // đặt URL cố định tại đây
+    document.getElementById('shot').src = SNAPSHOT_URL;
+
+    /* ===== Map 2D (walls + path + current pos) ===== */
+    const c = document.getElementById('map2d');
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height, scale = 50;
+    const poseText = document.getElementById('poseText');
+    let path = []; // lưu lịch sử hành trình (m từ gốc)
+
+    // vẽ tường (vài ngã 3/ngã tư giả lập giống sơ đồ tầng)
+    function drawWalls(){
+      ctx.strokeStyle="#000"; ctx.lineWidth=3; ctx.lineCap="square";
+      // khung ngoài
+      rect(30,30,420,420);
+      // các hành lang & phòng (giản lược)
+      seg(240,30,240,450);              // hành lang dọc
+      seg(240,120,420,120);             // nhánh ngang 1
+      seg(240,220,120,220);             // nhánh ngang 2 (trái) -> tạo ngã 3
+      seg(120,220,120,120);             // lên trên
+      seg(120,320,420,320);             // nhánh ngang 3 tạo ngã tư với hành lang dọc
+      seg(360,320,360,420);             // phòng dưới
+      seg(60,360,180,360);              // nhánh nhỏ
+      function seg(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+      function rect(x,y,w,h){ ctx.strokeRect(x,y,w,h); }
+    }
+
+    function drawAxes(){
+      ctx.strokeStyle="#cbd5e1"; ctx.lineWidth=1;
+      // trục Ox, Oy mảnh (chỉ để định vị gốc)
+      ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+    }
+
+    function toCanvas(px,py){ return {cx:W/2 + px*scale, cy:H/2 - py*scale}; }
+
+    function drawHeadingArrow(cx, cy, th){
+  	ctx.strokeStyle="#ef4444"; 
+  	ctx.lineWidth=2;
+  	ctx.beginPath();
+  	ctx.moveTo(cx, cy);
+  	// Mũi tên dài 20px, góc +60° (hướng 2 giờ)
+  	const dx = 20*Math.cos(th + Math.PI/3);
+  	const dy = -20*Math.sin(th + Math.PI/3);
+  	ctx.lineTo(cx+dx, cy+dy);
+  	ctx.stroke();
+	}
+
+
+    function redraw(px,py,th){
+      // nền trắng
+      ctx.clearRect(0,0,W,H);
+      ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
+      drawWalls();
+      drawAxes();
+      drawHeadingArrow(cx, cy, th);
+
+
+      // đường đi (màu đỏ mảnh)
+      if(path.length){
+        ctx.strokeStyle="#ef4444"; ctx.lineWidth=1.2;
+        ctx.beginPath();
+        path.forEach((p,i)=>{
+          const {cx,cy}=toCanvas(p.x,p.y);
+          if(i===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+        });
+        ctx.stroke();
+      }
+
+      // chấm đỏ thể hiện vị trí hiện tại
+      const {cx,cy}=toCanvas(px,py);
+      ctx.fillStyle="#ef4444"; ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fill();
+    }
+
+    // khởi tạo
+    redraw(0,0,0);
+    poseText.textContent=`x=0.000 m, y=0.000 m, θ=0.00 rad`;
+
+    // nhận /pose (nếu có) và vẽ hành trình
+    async function tickPose(){
+      const p = await jget('/pose');
+      if(!p) return;
+      const x = +p.x||0, y=+p.y||0, th=+p.theta||0;
+      path.push({x,y});
+      redraw(x,y,th);
+      poseText.textContent=`x=${x.toFixed(3)} m, y=${y.toFixed(3)} m, θ=${th.toFixed(2)} rad`;
+    }
+    setInterval(tickPose, 100); // 10 Hz
+
+    document.getElementById('resetPose').onclick = ()=>{
+      path.length=0;
+      redraw(0,0,0);
+      post('/reset_pose');
+      poseText.textContent=`x=0.000 m, y=0.000 m, θ=0.00 rad`;
+    };
+
+    /* ===== Patient demo buttons ===== */
+    document.getElementById('startBtn').onclick = ()=>post('/delivery/start');  // cập nhật LCD ở firmware
+    document.getElementById('confirmBtn').onclick= ()=>post('/delivery/confirm');
+
+    /* ===== System status (3 dòng) ===== */
+    async function refreshStatus(){
+      const s = await jget('/status') || {};
+      document.getElementById('bat').textContent  = s.battery!=null? s.battery+' %':'—';
+      document.getElementById('rssi').textContent = s.rssi!=null? s.rssi+' dBm':'—';
+      document.getElementById('cpu').textContent  = s.cpu!=null? s.cpu+' %':'—';
+    }
+    setInterval(refreshStatus, 2000); refreshStatus();
+
+    /* ===== Event log ===== */
+    const logUl = document.getElementById('log');
+    async function refreshLog(){
+      const arr = await jget('/events') || [];
+      logUl.innerHTML='';
+      arr.slice(0,20).forEach(e=>{
+        const li=document.createElement('li');
+        li.textContent = `[${e.ts||'--:--:--'}] ${e.msg||''}`;
+        logUl.appendChild(li);
+      });
+    }
+    setInterval(refreshLog,3000); refreshLog();
+
+    /* ===== Light & Buzzer ===== */
+    document.getElementById('lightOn').onclick =()=>fetch('/light?state=1');
+    document.getElementById('lightOff').onclick=()=>fetch('/light?state=0');
+    const bz=document.getElementById('buzzOn');
+    bz.onmousedown =()=>fetch('/buzzer?state=1');  bz.onmouseup =()=>fetch('/buzzer?state=0');
+    bz.ontouchstart=()=>fetch('/buzzer?state=1');  bz.ontouchend=()=>fetch('/buzzer?state=0');
+
+    /* ===== Servo control ===== */
+    function setServo(slot, angle){ fetch(`/servo?slot=${slot}&angle=${angle}`); }
+  </script>
+</body>
+</html>
